@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QELVRA GRID MAKER STUDIO</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&display=swap');
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Orbitron, sans-serif;
+}
+
+body{
+  height:100vh;
+  display:flex;
+  overflow:hidden;
+  color:white;
+}
+
+/* 🌈 ULTRA RGB BACKGROUND */
+body::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background: linear-gradient(45deg,
+    #ff004c,
+    #ff7a00,
+    #ffee00,
+    #00ff85,
+    #00c3ff,
+    #7a00ff,
+    #ff00e6);
+  background-size:400% 400%;
+  animation:rgb 10s infinite linear;
+  z-index:-2;
+  filter:blur(40px);
+}
+
+@keyframes rgb{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+
+/* DARK OVERLAY FOR MODERN LOOK */
+body::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.55);
+  z-index:-1;
+}
+
+/* SIDEBAR */
+.sidebar{
+  width:340px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+
+  background:rgba(255,255,255,0.05);
+  backdrop-filter:blur(18px);
+
+  border-right:1px solid rgba(255,255,255,0.15);
+  box-shadow:0 0 30px rgba(0,0,0,0.5);
+}
+
+/* PANELS */
+.panel{
+  padding:12px;
+  border-radius:12px;
+
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.15);
+
+  box-shadow:0 0 20px rgba(0,0,0,0.3);
+}
+
+label{
+  font-size:11px;
+  letter-spacing:1px;
+  display:block;
+  margin-bottom:8px;
+  color:#00ffe5;
+}
+
+/* INPUTS */
+input[type="range"]{
+  width:100%;
+  accent-color:#ff00ff;
+}
+
+input[type="file"],
+input[type="color"]{
+  width:100%;
+  padding:6px;
+  border-radius:8px;
+  border:1px solid #00ffe5;
+  background:#000;
+  color:#00ffe5;
+}
+
+/* INFO */
+.info{
+  margin-top:6px;
+  font-size:12px;
+  color:#ffffff;
+}
+
+/* BUTTONS */
+button{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  cursor:pointer;
+
+  border-radius:10px;
+  border:none;
+
+  color:#000;
+  font-weight:700;
+
+  background:linear-gradient(90deg,#ff00cc,#00ffcc,#3366ff,#ffcc00);
+  background-size:300% 300%;
+  animation:btn 5s infinite linear;
+  transition:0.2s;
+}
+
+@keyframes btn{
+  0%{background-position:0% 50%}
+  100%{background-position:100% 50%}
+}
+
+button:hover{
+  transform:scale(1.04);
+  box-shadow:0 0 25px rgba(255,255,255,0.4);
+}
+
+/* VIEWER */
+.viewer{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  cursor:grab;
+}
+
+.viewer.dragging{
+  cursor:grabbing;
+}
+
+canvas{
+  position:absolute;
+  top:0;
+  left:0;
+  border-radius:10px;
+  box-shadow:0 0 50px rgba(0,255,255,0.3);
+}
+
+/* 🔥 WATERMARK */
+.watermark{
+  position:fixed;
+  bottom:12px;
+  right:16px;
+  font-size:12px;
+  color:rgba(255,255,255,0.75);
+  letter-spacing:1px;
+  z-index:9999;
+  padding:6px 10px;
+  border-radius:8px;
+  background:rgba(0,0,0,0.25);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.2);
+  text-shadow:0 0 10px rgba(0,255,255,0.5);
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<div class="panel">
+<label>UPLOAD IMAGE</label>
+<input type="file" id="upload">
+</div>
+
+<div class="panel">
+<label>GRID ROWS</label>
+<input type="range" id="rows" min="2" max="100" value="10">
+<div class="info" id="rInfo">10 ROWS</div>
+</div>
+
+<div class="panel">
+<label>GRID COLUMNS</label>
+<input type="range" id="cols" min="2" max="100" value="10">
+<div class="info" id="cInfo">10 COLS</div>
+</div>
+
+<div class="panel">
+<label>THICKNESS</label>
+<input type="range" id="thickness" min="1" max="10" value="1">
+</div>
+
+<div class="panel">
+<label>GRID COLOR</label>
+<input type="color" id="color" value="#00ffe5">
+</div>
+
+<div class="panel">
+<button onclick="downloadImage()">EXPORT IMAGE</button>
+</div>
+
+</div>
+
+<div class="viewer" id="viewer">
+<canvas id="canvas"></canvas>
+</div>
+
+<!-- 🔥 WATERMARK -->
+<div class="watermark">
+Powered by QELVRA by Hisham Poonthala
+</div>
+
+<script>
+
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+
+const off=document.createElement("canvas");
+const octx=off.getContext("2d");
+
+let img=null;
+let zoom=1, panX=0, panY=0;
+
+const rows=document.getElementById("rows");
+const cols=document.getElementById("cols");
+const thickness=document.getElementById("thickness");
+const color=document.getElementById("color");
+
+const rInfo=document.getElementById("rInfo");
+const cInfo=document.getElementById("cInfo");
+
+function updateLabels(){
+  rInfo.textContent=rows.value+" ROWS";
+  cInfo.textContent=cols.value+" COLS";
+}
+
+/* RENDER */
+function render(){
+  if(!img) return;
+
+  off.width=img.width;
+  off.height=img.height;
+
+  octx.clearRect(0,0,off.width,off.height);
+  octx.drawImage(img,0,0);
+
+  const r=+rows.value;
+  const c=+cols.value;
+
+  const cw=off.width/c;
+  const ch=off.height/r;
+
+  octx.strokeStyle=color.value;
+  octx.lineWidth=thickness.value;
+
+  for(let i=0;i<=c;i++){
+    octx.beginPath();
+    octx.moveTo(i*cw,0);
+    octx.lineTo(i*cw,off.height);
+    octx.stroke();
+  }
+
+  for(let i=0;i<=r;i++){
+    octx.beginPath();
+    octx.moveTo(0,i*ch);
+    octx.lineTo(off.width,i*ch);
+    octx.stroke();
+  }
+
+  canvas.width=off.width;
+  canvas.height=off.height;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(off,0,0);
+
+  updateTransform();
+}
+
+/* IMAGE UPLOAD */
+document.getElementById("upload").onchange=e=>{
+  const f=e.target.files[0];
+  if(!f) return;
+
+  const r=new FileReader();
+  r.onload=ev=>{
+    img=new Image();
+    img.onload=()=>{
+      zoom=1; panX=0; panY=0;
+      render();
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(f);
+};
+
+/* CONTROLS */
+rows.oninput=()=>{updateLabels();render();}
+cols.oninput=()=>{updateLabels();render();}
+thickness.oninput=render;
+color.oninput=render;
+
+updateLabels();
+
+/* ZOOM + PAN */
+const viewer=document.getElementById("viewer");
+
+viewer.onwheel=e=>{
+  e.preventDefault();
+  zoom += e.deltaY<0 ? 0.1 : -0.1;
+  zoom=Math.max(0.2,Math.min(10,zoom));
+  updateTransform();
+};
+
+let drag=false,startX,startY;
+
+viewer.onmousedown=e=>{
+  drag=true;
+  startX=e.clientX-panX;
+  startY=e.clientY-panY;
+  viewer.classList.add("dragging");
+};
+
+window.onmouseup=()=>{
+  drag=false;
+  viewer.classList.remove("dragging");
+};
+
+window.onmousemove=e=>{
+  if(!drag) return;
+  panX=e.clientX-startX;
+  panY=e.clientY-startY;
+  updateTransform();
+};
+
+function updateTransform(){
+  canvas.style.transform=
+  `translate(${panX}px,${panY}px) scale(${zoom})`;
+  canvas.style.transformOrigin="0 0";
+}
+
+/* EXPORT */
+function downloadImage(){
+  const a=document.createElement("a");
+  a.download="QELVRA_RGB_GRID.png";
+  a.href=canvas.toDataURL();
+  a.click();
+}
+
+</script>
+
+</body>
+</html>
